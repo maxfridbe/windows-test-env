@@ -1,0 +1,26 @@
+# Standalone: pulls the prebuilt image; the ISO downloads and Windows installs on first RUN, not build.
+#   VM_PATH=/big/disk/win11 docker compose -f docker-compose.standalone.yml up -d
+# VM_PATH holds the VM disk + downloaded ISO (default ./vm). Watch progress at http://localhost:8006
+services:
+  windows:
+    image: ghcr.io/maxfridbe/windows-test-env:latest
+    container_name: windows-test-env
+    environment:
+      VERSION: "${VERSION:-11}"
+      USERNAME: "${WIN_USERNAME:-Docker}"
+      PASSWORD: "${WIN_PASSWORD:-admin}"
+      RAM_SIZE: "${RAM_SIZE:-8G}"
+      CPU_CORES: "${CPU_CORES:-4}"
+      DISK_SIZE: "${DISK_SIZE:-64G}"
+    devices:
+      - /dev/kvm
+      - /dev/net/tun
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "8006:8006"
+      - "3389:3389/tcp"
+      - "3389:3389/udp"
+    volumes:
+      - "${VM_PATH:-./vm}:/storage"
+    stop_grace_period: 2m
