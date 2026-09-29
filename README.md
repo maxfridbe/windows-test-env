@@ -11,17 +11,70 @@ and a web RDP console (Apache Guacamole) enabled by default.
 - `ssh`, `scp`, `ssh-keygen` (OpenSSH client)
 - Disk space: the Windows ISO (5-8 GB) plus the VM disk (default 64 GB, sparse) plus one checkpoint copy
 
-## Quick start
+## Initial setup
+
+1. **Check the host can run it.**
+
+   ```bash
+   ls -l /dev/kvm && [ -r /dev/kvm ] && [ -w /dev/kvm ] && echo "kvm ok"
+   docker info >/dev/null && docker compose version && echo "docker ok"
+   ```
+
+   If `/dev/kvm` is not writable: `sudo usermod -aG kvm $USER`, then log out and back in.
+   If `docker info` fails with a permission error: `sudo usermod -aG docker $USER`, same again.
+   Nested virtualization must be enabled if the host is itself a VM.
+
+2. **Clone and enter the repo.**
+
+   ```bash
+   git clone <this repo> windows-test-env
+   cd windows-test-env
+   ```
+
+3. **Review `.env` before the first start.** The values that matter most:
+
+   | Setting | Default | Notes |
+   |---|---|---|
+   | `VERSION` | `11` | Windows edition for *new* VMs (`11`, `11l`, `10`, `2022`, `2025`, ...). See the [dockur list](https://github.com/dockur/windows#how-do-i-select-the-windows-version). |
+   | `WIN_USERNAME` / `WIN_PASSWORD` | `Docker` / `admin` | Local administrator created during install; also the RDP and SSH password login. |
+   | `RAM_SIZE` / `CPU_CORES` / `DISK_SIZE` | `8G` / `4` / `64G` | The disk is sparse, so only used space counts. |
+   | `WEB_PORT`, `RDP_PORT`, `SSH_PORT`, `GUAC_PORT`, `VNC_PORT` | `8006`, `3389`, `2222`, `8080`, `5900` | Change any that collide with something on the host. |
+   | `GUAC_USER` / `GUAC_PASSWORD` | `admin` / `admin` | Guacamole web login. |
+   | `VNC_BIND` | `127.0.0.1` | Raw VNC has no password; leave it on localhost. |
+
+   VM state goes to `~/.config/windows-test-env`. Set `WTE_HOME=/some/other/path` in your environment
+   to keep it elsewhere (for example on a bigger disk).
+
+4. **First start.**
+
+   ```bash
+   ./start-with-openssh.sh
+   ```
+
+   This creates a VM named `win<VERSION>_<today>`, generates an SSH keypair, downloads the Windows ISO
+   (5-8 GB), runs the unattended install, sets up OpenSSH, and finally shuts down once to save the
+   baseline checkpoint before booting again. Expect 20-45 minutes depending on bandwidth. You can watch
+   at http://127.0.0.1:8006 (raw console) or http://127.0.0.1:8080 (Guacamole, "console VNC"
+   connection). The script prints all access details when SSH is reachable.
+
+5. **Verify.**
+
+   ```bash
+   ./ssh.sh 'hostname'
+   ./vm.sh list
+   ```
+
+Nothing outside `~/.config/windows-test-env` (or `WTE_HOME`) and the Docker images is written to the host,
+so removing the VM directory and the repo removes everything.
+
+## Quick start (after setup)
 
 ```bash
-./start-with-openssh.sh          # first run: creates a VM, downloads + installs Windows (15-40 min),
-                                 # sets up OpenSSH, saves a baseline checkpoint, prints access info
+./start-with-openssh.sh          # boot the current VM and wait for SSH
 ./ssh.sh 'Get-ComputerInfo | Select-Object OsName, OsVersion'
 ./reset.sh -y                    # back to the checkpoint in a few minutes
 ./stop.sh
 ```
-
-Watch the install at http://127.0.0.1:8006 or through Guacamole at http://127.0.0.1:8080.
 
 ## Scripts
 
