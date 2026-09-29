@@ -1,0 +1,5 @@
+# generated from the host keypair on every start
+oem/authorized_keys
+# leftovers from ad-hoc edits
+*.new
+*.log

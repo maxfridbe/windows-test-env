@@ -1,0 +1,52 @@
+# Paths and VM name are exported by lib.sh (VM state lives in ~/.config/windows-test-env/<name>).
+services:
+  windows:
+    image: dockurr/windows
+    container_name: windows-test-env
+    labels:
+      windows-test-env.vm: "${VM_NAME:-}"
+    environment:
+      VERSION: "${VERSION:-11}"
+      USERNAME: "${WIN_USERNAME:-Docker}"
+      PASSWORD: "${WIN_PASSWORD:-admin}"
+      RAM_SIZE: "${RAM_SIZE:-8G}"
+      CPU_CORES: "${CPU_CORES:-4}"
+      DISK_SIZE: "${DISK_SIZE:-64G}"
+    devices:
+      - /dev/kvm
+      - /dev/net/tun
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "${WEB_PORT:-8006}:8006"        # web viewer (noVNC) for install / console
+      - "${RDP_PORT:-3389}:3389/tcp"    # RDP
+      - "${RDP_PORT:-3389}:3389/udp"
+      - "${SSH_PORT:-2222}:22"          # OpenSSH server inside Windows
+      - "${VNC_BIND:-127.0.0.1}:${VNC_PORT:-5900}:5900"   # raw QEMU VNC (virt-viewer / remote-viewer)
+    volumes:
+      - "${VM_STORAGE:?run via the scripts, which set VM_STORAGE}:/storage"
+      - "${VM_SHARED:?run via the scripts, which set VM_SHARED}:/shared"
+      - ./oem:/oem                      # copied to C:\OEM, install.bat runs post-install
+    stop_grace_period: 2m
+
+  # --- Apache Guacamole: RDP (and VNC console) in the browser, on by default ---
+  guacd:
+    image: guacamole/guacd
+    container_name: windows-test-env-guacd
+    restart: unless-stopped
+    volumes:
+      - "${VM_SHARED:?}:/drive"         # exposed inside the RDP session as a "Shared" drive too
+  guacamole:
+    image: guacamole/guacamole
+    container_name: windows-test-env-guac
+    restart: unless-stopped
+    depends_on: [guacd, windows]
+    environment:
+      GUACD_HOSTNAME: guacd
+      GUACD_PORT: "4822"
+      GUACAMOLE_HOME: /guac-home
+      WEBAPP_CONTEXT: ROOT
+    volumes:
+      - "${GUAC_HOME:?run via the scripts, which set GUAC_HOME}:/guac-home:ro"
+    ports:
+      - "${GUAC_PORT:-8080}:8080"       # http://127.0.0.1:8080  (login: GUAC_USER / GUAC_PASSWORD from .env)
